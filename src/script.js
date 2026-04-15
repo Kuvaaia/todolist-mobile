@@ -1,12 +1,14 @@
 import { Capacitor } from "@capacitor/core";
+import { LocalNotifications } from "@capacitor/local-notifications";
 
-const STORAGE_KEY = "tasks_v3";
+const STORAGE_KEY = "tasks_v4";
 const THEME_KEY = "theme_v1";
 
 const taskForm = document.getElementById("task-form");
 const taskInput = document.getElementById("task-input");
 const taskPriority = document.getElementById("task-priority");
 const taskDate = document.getElementById("task-date");
+const taskTime = document.getElementById("task-time");
 const addTaskBtn = document.getElementById("add-task-btn");
 
 const taskList = document.getElementById("task-list");
@@ -25,13 +27,6 @@ let draggedTaskId = null;
 
 init();
 
-function markNativePlatform() {
-  if (Capacitor.isNativePlatform()) {
-    document.documentElement.classList.add("native-app");
-    document.body.classList.add("native-app");
-  }
-}
-
 function init() {
   markNativePlatform();
   applySavedTheme();
@@ -41,10 +36,17 @@ function init() {
   render();
 }
 
+function markNativePlatform() {
+  if (Capacitor.isNativePlatform()) {
+    document.documentElement.classList.add("native-app");
+    document.body.classList.add("native-app");
+  }
+}
+
 function bindEvents() {
   taskInput.addEventListener("input", updateAddButtonState);
 
-  taskForm.addEventListener("submit", (event) => {
+  taskForm.addEventListener("submit", async (event) => {
     event.preventDefault();
 
     const text = taskInput.value.trim();
@@ -56,14 +58,24 @@ function bindEvents() {
       completed: false,
       priority: taskPriority.value,
       date: taskDate.value || null,
+      time: taskTime?.value || null,
       createdAt: Date.now(),
       order: getNextOrderValue(),
+      notificationId: createNotificationId(),
     };
 
     tasks.push(newTask);
     saveTasks();
+
+    try {
+      await scheduleTaskNotification(newTask);
+    } catch (error) {
+      console.error("Erreur lors de la programmation de la notification :", error);
+    }
+
     taskForm.reset();
     taskPriority.value = "medium";
+    if (taskTime) taskTime.value = "";
     taskInput.focus();
     updateAddButtonState();
     render();
@@ -93,23 +105,35 @@ function bindEvents() {
     updateThemeButtonLabel();
   });
 
-  clearBtn.addEventListener("click", () => {
+  clearBtn.addEventListener("click", async () => {
     if (tasks.length === 0) return;
 
     const confirmed = confirm("Supprimer toutes les tâches ?");
     if (!confirmed) return;
+
+    try {
+      await cancelNotificationsForTasks(tasks);
+    } catch (error) {
+      console.error("Erreur lors de l'annulation des notifications :", error);
+    }
 
     tasks = [];
     saveTasks();
     render();
   });
 
-  clearCompletedBtn.addEventListener("click", () => {
-    const completedCount = tasks.filter((task) => task.completed).length;
-    if (completedCount === 0) return;
+  clearCompletedBtn.addEventListener("click", async () => {
+    const completedTasks = tasks.filter((task) => task.completed);
+    if (completedTasks.length === 0) return;
 
     const confirmed = confirm("Supprimer toutes les tâches terminées ?");
     if (!confirmed) return;
+
+    try {
+      await cancelNotificationsForTasks(completedTasks);
+    } catch (error) {
+      console.error("Erreur lors de l'annulation des notifications :", error);
+    }
 
     tasks = tasks.filter((task) => !task.completed);
     normalizeTaskOrderFromCurrentArray();
@@ -123,7 +147,7 @@ function updateAddButtonState() {
 }
 
 function isMobileApp() {
-  return window.Capacitor?.isNativePlatform?.() === true;
+  return Capacitor.isNativePlatform();
 }
 
 function isTouchDevice() {
@@ -154,8 +178,11 @@ function loadTasks() {
       completed: Boolean(task.completed),
       priority: task.priority ?? "medium",
       date: task.date ?? null,
+      time: task.time ?? null,
       createdAt: typeof task.createdAt === "number" ? task.createdAt : Date.now() + index,
       order: typeof task.order === "number" ? task.order : index,
+      notificationId:
+        typeof task.notificationId === "number" ? task.notificationId : createNotificationId(),
     }));
   } catch (error) {
     console.error("Erreur lors du chargement des tâches :", error);
@@ -295,8 +322,15 @@ function createTaskElement(task) {
   if (task.date) {
     const dateElement = document.createElement("span");
     dateElement.className = "badge";
-    dateElement.textContent = formatDate(task.date);
+    dateElement.textContent = `📅 ${formatDate(task.date)}`;
     taskMeta.appendChild(dateElement);
+  }
+
+  if (task.time) {
+    const timeElement = document.createElement("span");
+    timeElement.className = "badge";
+    timeElement.textContent = `⏰ ${task.time}`;
+    taskMeta.appendChild(timeElement);
   }
 
   taskTop.appendChild(textElement);
@@ -448,21 +482,46 @@ function normalizeTaskOrderFromCurrentArray() {
   }));
 }
 
-function toggleTask(taskId) {
+async function toggleTask(taskId) {
+  const targetTask = tasks.find((task) => task.id === taskId);
+  if (!targetTask) return;
+
+  const nextCompleted = !targetTask.completed;
+
   tasks = tasks.map((task) =>
-    task.id === taskId ? { ...task, completed: !task.completed } : task
+    task.id === taskId ? { ...task, completed: nextCompleted } : task
   );
 
   saveTasks();
+
+  try {
+    if (nextCompleted) {
+      await cancelNotificationForTask(
+        tasks.find((task) => task.id === taskId)
+      );
+    } else {
+      const updatedTask = tasks.find((task) => task.id === taskId);
+      await scheduleTaskNotification(updatedTask);
+    }
+  } catch (error) {
+    console.error("Erreur notification toggle :", error);
+  }
+
   render();
 }
 
-function deleteTask(taskId) {
+async function deleteTask(taskId) {
   const task = tasks.find((item) => item.id === taskId);
   if (!task) return;
 
   const confirmed = confirm(`Supprimer la tâche "${task.text}" ?`);
   if (!confirmed) return;
+
+  try {
+    await cancelNotificationForTask(task);
+  } catch (error) {
+    console.error("Erreur lors de l'annulation de la notification :", error);
+  }
 
   tasks = tasks.filter((item) => item.id !== taskId);
   normalizeTaskOrderFromCurrentArray();
@@ -546,15 +605,25 @@ function getPriorityWeight(priority) {
 }
 
 function compareTaskDates(a, b, direction = "asc") {
-  const aTime = a.date
-    ? new Date(`${a.date}T00:00:00`).getTime()
-    : Number.MAX_SAFE_INTEGER;
-
-  const bTime = b.date
-    ? new Date(`${b.date}T00:00:00`).getTime()
-    : Number.MAX_SAFE_INTEGER;
+  const aTime = getTaskDateTimeValue(a, direction === "asc");
+  const bTime = getTaskDateTimeValue(b, direction === "asc");
 
   return direction === "asc" ? aTime - bTime : bTime - aTime;
+}
+
+function getTaskDateTimeValue(task, ascMode = true) {
+  if (!task.date) {
+    return ascMode ? Number.MAX_SAFE_INTEGER : Number.MIN_SAFE_INTEGER;
+  }
+
+  const dateTimeString = `${task.date}T${task.time || "23:59"}:00`;
+  const value = new Date(dateTimeString).getTime();
+
+  if (Number.isNaN(value)) {
+    return ascMode ? Number.MAX_SAFE_INTEGER : Number.MIN_SAFE_INTEGER;
+  }
+
+  return value;
 }
 
 function formatDate(dateString) {
@@ -585,4 +654,69 @@ function applySavedTheme() {
 function updateThemeButtonLabel() {
   const isDark = document.documentElement.dataset.theme === "dark";
   themeToggle.textContent = isDark ? "☀️ Mode clair" : "🌙 Mode sombre";
+}
+
+function createNotificationId() {
+  return Math.floor(Math.random() * 900000000) + 100000000;
+}
+
+async function ensureNotificationPermission() {
+  if (!Capacitor.isNativePlatform()) return true;
+
+  const status = await LocalNotifications.checkPermissions();
+
+  if (status.display === "granted") {
+    return true;
+  }
+
+  const requested = await LocalNotifications.requestPermissions();
+  return requested.display === "granted";
+}
+
+async function scheduleTaskNotification(task) {
+  if (!Capacitor.isNativePlatform()) return;
+  if (!task || task.completed) return;
+  if (!task.date || !task.time) return;
+
+  const at = new Date(`${task.date}T${task.time}:00`);
+
+  if (Number.isNaN(at.getTime()) || at <= new Date()) {
+    return;
+  }
+
+  const granted = await ensureNotificationPermission();
+  if (!granted) return;
+
+  await LocalNotifications.schedule({
+    notifications: [
+      {
+        id: task.notificationId,
+        title: "Planify",
+        body: task.text,
+        schedule: { at },
+        smallIcon: "ic_launcher_foreground",
+      },
+    ],
+  });
+}
+
+async function cancelNotificationForTask(task) {
+  if (!Capacitor.isNativePlatform()) return;
+  if (!task || typeof task.notificationId !== "number") return;
+
+  await LocalNotifications.cancel({
+    notifications: [{ id: task.notificationId }],
+  });
+}
+
+async function cancelNotificationsForTasks(taskArray) {
+  if (!Capacitor.isNativePlatform()) return;
+
+  const notifications = taskArray
+    .filter((task) => typeof task.notificationId === "number")
+    .map((task) => ({ id: task.notificationId }));
+
+  if (notifications.length === 0) return;
+
+  await LocalNotifications.cancel({ notifications });
 }
