@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ma To-Do List</title>
+  <link rel="icon" type="image/png" href="/favicon.png" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  />
+  <script type="module" crossorigin src="/todolist-mobile/assets/index-B845ByJs.js"></script>
+  <link rel="stylesheet" crossorigin href="/todolist-mobile/assets/index-i8wmtVLl.css">
+</head>
+<body>
+  <main class="app-shell">
+    <section class="todo-container">
+      <header class="top-bar">
+        <div class="title-block">
+          <p class="eyebrow">Focus & organisation</p>
+          <h1>Ma To-Do List</h1>
+          <p class="subtitle">
+            Une interface simple, rapide et agréable pour garder le contrôle.
+          </p>
+        </div>
+
+        <div class="top-actions">
+          <a href="https://kuvaaia.github.io/portfolio/" class="portfolio-link">Portfolio</a>
+          <button id="theme-toggle" type="button" class="theme-toggle" aria-label="Changer le thème">
+            🌙
+          </button>
+        </div>
+      </header>
+
+      <section class="hero-card">
+        <div class="hero-copy">
+          <span class="hero-badge">Productivité</span>
+          <h2>Concentre-toi sur l’essentiel</h2>
+          <p>
+            Ajoute, trie et organise tes tâches dans une expérience moderne,
+            lisible et pensée pour mobile.
+          </p>
+        </div>
+
+        <div class="hero-stats">
+          <div class="mini-stat">
+            <span class="mini-stat-label">Vue</span>
+            <strong>Clair</strong>
+          </div>
+          <div class="mini-stat">
+            <span class="mini-stat-label">Style</span>
+            <strong>Premium</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="composer-card">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker">Nouvelle tâche</p>
+            <h3>Ajoute rapidement ce que tu dois faire</h3>
+          </div>
+        </div>
+
+        <form id="task-form" class="todo-input">
+          <div class="input-main">
+            <label class="sr-only" for="task-input">Nouvelle tâche</label>
+            <input
+              type="text"
+              id="task-input"
+              placeholder="Ajouter une tâche..."
+              maxlength="120"
+              autocomplete="off"
+            />
+            <button id="add-task-btn" type="submit">Ajouter</button>
+          </div>
+
+          <div class="input-options">
+            <div class="field-group">
+              <label for="task-priority">Priorité</label>
+              <select id="task-priority" aria-label="Priorité">
+                <option value="low">Faible</option>
+                <option value="medium" selected>Moyenne</option>
+                <option value="high">Haute</option>
+              </select>
+            </div>
+
+            <div class="field-group">
+              <label for="task-date">Date</label>
+              <input type="date" id="task-date" aria-label="Date de la tâche" />
+            </div>
+          </div>
+        </form>
+      </section>
+
+      <section class="toolbar-card">
+        <div class="section-head compact">
+          <div>
+            <p class="section-kicker">Organisation</p>
+            <h3>Filtre et trie selon ton besoin</h3>
+          </div>
+        </div>
+
+        <div class="filters">
+          <button type="button" class="filter-btn active" data-filter="all">Toutes</button>
+          <button type="button" class="filter-btn" data-filter="active">À faire</button>
+          <button type="button" class="filter-btn" data-filter="completed">Terminées</button>
+          <button type="button" class="filter-btn" data-filter="today">Aujourd’hui</button>
+          <button type="button" class="filter-btn" data-filter="high">Priorité haute</button>
+        </div>
+
+        <div class="sort-box">
+          <label for="sort-select">Trier</label>
+          <select id="sort-select">
+            <option value="custom">Ordre manuel</option>
+            <option value="newest">Plus récentes</option>
+            <option value="oldest">Plus anciennes</option>
+            <option value="priority">Priorité</option>
+            <option value="dateAsc">Date proche</option>
+            <option value="dateDesc">Date lointaine</option>
+          </select>
+        </div>
+      </section>
+
+      <section class="status-bar">
+        <div class="status-pill">
+          <span class="status-dot"></span>
+          <p id="task-counter">0 à faire · 0 terminée(s)</p>
+        </div>
+
+        <div class="task-actions">
+          <button id="clear-completed-btn" type="button" class="link-btn">
+            Supprimer les terminées
+          </button>
+          <button id="clear-btn" type="button" class="link-btn danger">
+            Tout supprimer
+          </button>
+        </div>
+      </section>
+
+      <p class="drag-hint">
+        Réorganisation manuelle disponible en mode « Ordre manuel ».
+      </p>
+
+      <ul id="task-list" aria-live="polite"></ul>
+    </section>
+  </main>
+</body>
+</html>
